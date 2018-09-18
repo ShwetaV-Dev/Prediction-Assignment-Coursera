@@ -8,3 +8,5 @@ Source for the dataset:  http://web.archive.org/web/20161224072740/http:/groupwa
 The training data for this project are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
 
 The test data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+Link to RPubs: http://rpubs.com/ShwetaV/PredictionAssignment
