@@ -1,0 +1,147 @@
+---
+title: "Prediction Assignment - Coursera"
+author: "Shweta V"
+date: "9/12/2018"
+output: html_document
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+library(kernlab)
+library(caret)
+library(randomForest)
+
+```
+
+##OVERVIEW:
+###The goal of this project is to predict the manner in which 6 participants did the exercise. The data used from accelerometers on the belt, forearm, arm, and dumbell of the participants, "classe" variable in the training set is used for the prediction. Report is to describe how to built the model, to use cross validation, display the expected out of sample error and explain the analysis made. Also, used the prediction model to predict 20 different test cases.
+###Source for the dataset:  http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har
+
+##BACKGROUND:
+###Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement for a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+##DATA LOADING:
+###The training data for this project are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+###The test data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+```{r LoadData}
+#load the training and testing dataset
+training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings = c("NA", "#DIV/0!", ""))
+dim(training)
+
+testing <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", na.strings = c("NA", "#DIV/0!", ""))
+dim(testing)
+```
+
+##DATA PRE-PROCESSING:
+```{r PreProcessing}
+#Remove the first 6 columns from the datasets as they are just for information and reference purposes.
+training <- training[, 7:160]
+testing  <- testing[, 7:160]
+#removing all columns that are mostly NAs:
+training <- training[sapply(training, function(x) !any(is.na(x)))] 
+testing <- testing[sapply(testing, function(x) !any(is.na(x)))] 
+
+table(training$classe)
+```
+
+##CROSS VALIDATION:
+###Now, let's split the training set into two for cross validation purposes. We randomly subsample 60% of the data for model building and remaining 40% for the accuracy measurement.
+
+```{r crossValidation}
+#set the seed for reproducible analysis
+set.seed(12345)
+inTrain <- createDataPartition(y=training$classe, p=0.60, list=FALSE)
+train_data  <- training[inTrain,]
+test_data  <- training[-inTrain,]
+```
+
+###Remove zero covariates from the training and testing data
+```{r}
+nsv <- nearZeroVar(train_data, saveMetrics = TRUE)
+if(length(train_data[ , nsv$zeroVar]) > 0) {
+        train_data <- train_data[, -nzv_cols]
+        test_data <- test_data[, -nzv_cols]
+}
+```
+
+###Displaying dimensions of the data after pre-processing
+```{r}
+dim(train_data)
+dim(test_data)
+```
+
+##BUILD PREDICTION ANALYSIS:
+###First, let's convert all the variables to numeric
+
+```{r}
+train_data[1:53] <- lapply(train_data[1:53], as.numeric)
+```
+
+###Using Linear Discriminate Model for prediction
+```{r}
+modelFitLDA <- train(classe ~., data = train_data, preProcess = c("center", "scale"), method = "lda")
+predictionsLDA <- predict(modelFitLDA, newdata = test_data)
+
+#Using confusion Matrix to test results
+confusionMatrix(predictionsLDA, test_data$classe)
+```
+
+###It shows the accuracy of the model is 71.46% which isn't good.
+
+###Applying Random Forest Model for prediction
+```{r}
+modelFitRF <- train(classe ~., method = "rf", data = train_data, prox=TRUE,
+trControl=trainControl(method="cv",number=3))
+predictionsRF <- predict(modelFitRF, newdata = test_data)
+
+#Using confusion Matrix to test results
+confusionMatrix(predictionsRF, test_data$classe)
+```
+
+###It show the accuracy of the model is over 99% which is quite good. So, Random forest is a better model choice than LDA.
+
+```{r}
+table(predictionsLDA, predictionsRF)
+```
+
+###Plot to represent both the predictions.
+```{r}
+qplot(predictionsLDA, predictionsRF, colour=classe, data = test_data)
+```
+
+##ESTIMATING OUT OF SAMPLE ERROR RATE:
+###Check the accuracy of the Random Forest predictions using the test data set.
+```{r}
+errorRate = mean(predictionsRF != test_data$classe)
+errorRate
+```
+
+###So, our out of sample error rate is 0.29% using the Random forest algorithm
+
+##PREDICT 20 DIFFERENT CASES:
+```{r}
+predictions <- predict(modelFitRF, newdata=testing)
+predictions
+```
+
+###Created 20 files with predictions for the 20 rows of data in testing data set
+
+```{r}
+write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_",i,".txt")
+    write.table(x[i], file=filename, quote=FALSE, row.names=FALSE, col.names=FALSE)
+  }
+}
+write_files(predictions)
+
+```
+
+##CONCLUSION:
+###We accurately predicted the classification of 20 observations using a Random Forest algorithm trained on a subset of data.
+###The accuracy obtained is 99.71% which is quite good and out of sample error rate is 0.29%.
+
+
+
